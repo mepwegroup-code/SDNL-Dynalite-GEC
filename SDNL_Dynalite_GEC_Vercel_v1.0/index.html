@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SDNL Dynalite GEC</title>
+<script src="/vendor/xlsx.full.min.js"></script>
+<script src="/vendor/jspdf.umd.min.js"></script>
+<script src="/vendor/Sortable.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="mk">G</div><div>SDNL Dynalite GEC<small>AutoLISP · Dynalite Signify · v1.0 · DyNet / DALI / Relay / DMX</small></div></div>
+  <div class="proj">
+    <input id="pName" class="w1" placeholder="Tên khách hàng / dự án">
+    <input id="pCode" class="w2" placeholder="Mã dự án">
+    <input id="pFloors" class="w3" type="number" min="1" value="1" title="Số tầng">
+  </div>
+  <div class="sp"></div>
+  <button class="tbtn ghost" id="btnImport"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Import Excel/CSV</button>
+  <button class="tbtn ghost" id="btnTpl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/></svg>Template Excel</button>
+  <div style="position:relative;display:inline-block"><button class="tbtn" id="btnLisp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>Export LISP ▾</button><div id="lispMenu" style="display:none;position:absolute;top:100%;right:0;background:#fff;border:1px solid var(--line);border-radius:7px;box-shadow:0 4px 16px rgba(0,0,0,.14);min-width:230px;z-index:20;padding:4px 0"><button class="lm-it" data-lm="wire">① Sơ đồ nguyên lý</button><button class="lm-it" data-lm="topo">② Sơ đồ tổng thể</button><button class="lm-it" data-lm="db">③ Tủ nguồn DB</button><button class="lm-it" data-lm="panel">④ Bố trí tủ (5 mặt: Ext/Int/Top/Bottom/Cắt)</button><hr style="margin:2px 8px;border:0;border-top:1px solid var(--line)"><button class="lm-it" data-lm="all" style="font-weight:700;color:#0284C7">⑤ Export All (4 file)</button></div></div>
+  <button class="tbtn ghost" id="btnHelp" title="Hướng dẫn sử dụng"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12" y2="17"/></svg>Help</button>
+  <input type="file" id="fileImp" accept=".xlsx,.xls,.csv" hidden>
+</header>
+
+<div class="tabs">
+  <button class="tab on" data-v="viewWire"><span class="n">1</span>Sơ đồ nguyên lý chi tiết</button>
+  <button class="tab" data-v="viewTopo"><span class="n">2</span>Sơ đồ tổng thể (Topology)</button>
+  <button class="tab" data-v="viewDB"><span class="n">3</span>Tủ nguồn DB-RCU</button>
+  <button class="tab" data-v="viewLayout"><span class="n">4</span>Bố trí tủ điện</button>
+  <button class="tab" data-v="viewCost"><span class="n">5</span>Giá sơ bộ</button>
+  <button class="tab" data-v="viewOpt"><span class="n">6</span>Chọn TB tối ưu ★</button>
+</div>
+
+<main>
+  <!-- ================= TAB 1 : WIRING ================= -->
+  <section class="view on" id="viewWire">
+    <!-- left: devices -->
+    <div class="col">
+      <div class="colhd"><h2>Thiết bị</h2><button class="tinybtn" id="btnAllDev" title="Tạo sơ đồ chứa 1 của mỗi thiết bị Dynalite trong catalog">⊞ Sơ đồ toàn bộ TB Dynalite</button></div>
+
+      <div class="card">
+        <div class="h">Controller chính<button class="tinybtn" id="addCtrl" style="margin-left:auto">+ Thêm</button></div>
+        <div class="b" id="ctrlList"></div>
+      </div>
+
+      <div class="card">
+        <div class="h">Extension Module<button class="tinybtn" id="addMod" style="margin-left:auto">+ Thêm</button></div>
+        <div class="b" id="modList"></div>
+      </div>
+
+      <div class="card">
+        <div class="h">Bộ nguồn</div>
+        <div class="b">
+          <div class="row">
+            <div class="fld"><label class="fl">Model / mô tả</label><input id="pwName" class="inp sm" value="DDNP1501 · DyNet PSU (bổ sung)"></div>
+          </div>
+          <div class="row">
+            <div class="fld"><label class="fl">Điện áp ra</label><input id="pwV" class="inp sm" value="15VDC"></div>
+            <div class="fld"><label class="fl">Terminal</label><input id="pwT" class="inp sm" value="V+ · GND"></div>
+          </div>
+          <div class="hint" style="margin-top:6px">DDNP1501 R8 cấp 15VDC cho thiết bị bus. Controller tải dùng AC L/N/PE riêng. Tách V+ từng vùng nguồn; không nối song song đầu ra nguồn của các controller. D+/D−, GND, SHLD theo tài liệu hãng.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="h">Khung tên bản vẽ (form GEC)</div>
+        <div class="b">
+          <div class="row"><div class="fld"><label class="fl">Tên bản vẽ</label><input id="tbTitle" class="inp sm" value="SƠ ĐỒ NGUYÊN LÝ RCU"></div></div>
+          <div class="row">
+            <div class="fld"><label class="fl">Số bản vẽ</label><input id="tbNo" class="inp sm" value="GEC-RCU-001"></div>
+            <div class="fld" style="max-width:70px"><label class="fl">REV</label><input id="tbRev" class="inp sm" value="00"></div>
+            <div class="fld" style="max-width:80px"><label class="fl">Tỉ lệ</label><input id="tbScale" class="inp sm" value="NTS"></div>
+          </div>
+          <div class="row">
+            <div class="fld"><label class="fl">Vẽ</label><input id="tbDrawn" class="inp sm" placeholder="—"></div>
+            <div class="fld"><label class="fl">K.tra</label><input id="tbChk" class="inp sm" placeholder="—"></div>
+            <div class="fld"><label class="fl">Duyệt</label><input id="tbApp" class="inp sm" placeholder="—"></div>
+          </div>
+          <div class="row"><div class="fld" style="max-width:150px"><label class="fl">MCB 1P mặc định (A)</label><input id="mcbDef" class="inp sm" value="10"></div></div>
+        </div>
+      </div>
+
+      <div class="hint">Dynalite dùng DyNet RS‑485, không dùng CAN. Xem mô tả model và tài liệu hãng để phân biệt relay chiếu sáng, relay rèm, standby relay và ngõ ra tín hiệu.</div>
+    </div>
+
+    <div class="gutter" data-g="w1"></div>
+
+    <!-- middle: IO mapping -->
+    <div class="col mid">
+      <div class="midbar">
+        <h2 id="ioTitle">Input / Output Mapping</h2>
+        <span class="badge" id="ioSub" style="font-size:11px;color:var(--muted)"></span>
+        <div class="sp"></div>
+        <select id="ioPick" class="inp sm" style="width:200px;height:32px"></select>
+        <button class="btn sm" id="btnAuto" style="height:32px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg>Auto-map</button>
+      </div>
+      <div class="miobody">
+        <div class="iohd">
+          <div class="iocol in">
+            <div class="t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M5 12h14M5 12l4-4M5 12l4 4"/></svg>INPUT<span class="pill" id="inCnt">0</span></div>
+            <div class="bd" id="inBody"><div class="empty">Chọn thiết bị để map input</div></div>
+          </div>
+          <div class="iocol out">
+            <div class="t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M5 12h14M19 12l-4-4M19 12l-4 4"/></svg>OUTPUT<span class="pill" id="outCnt">0</span></div>
+            <div class="bd" id="outBody"><div class="empty">Chọn thiết bị để map output</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="gutter" data-g="w3"></div>
+
+    <!-- right: preview -->
+    <div class="col pv">
+      <div class="pvbar">
+        <div class="seg"><button class="on" data-pv="svg">Sơ đồ</button><button data-pv="code">LISP</button></div>
+        <div class="sp"></div>
+        <button class="btn sm" id="dlDetail" style="height:30px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>diagram_detail.lsp</button>
+        <button class="btn sm" id="pdfWire" style="height:30px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>PDF A3</button>
+      </div>
+      <div class="pvwrap">
+        <svg class="svgbox" id="svgWire"></svg>
+        <div class="codebox" id="codeWire"><pre class="code mono" id="lispWire"></pre></div>
+        <div class="zoom" id="zoomWire"><button class="zhandle" data-z="drag" title="Kéo để di chuyển">✛</button><button data-z="-" title="Thu nhỏ">−</button><button data-z="f" title="Vừa khung">⤢</button><button data-z="+" title="Phóng to">+</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TAB 2 : TOPOLOGY ================= -->
+  <section class="view" id="viewTopo">
+    <div class="col">
+      <div class="colhd"><h2>Cấu trúc hệ thống</h2><button class="tinybtn" id="addFloor">+ Tầng</button></div>
+      <div class="card">
+        <div class="h">Phòng Server (ELV)</div>
+        <div class="b">
+          <div class="row">
+            <div class="fld"><label class="fl">Tên phòng</label><input id="svTitle" class="inp sm"></div>
+            <div class="fld" style="max-width:150px"><label class="fl">Đặt tại tầng</label><select id="svFloor" class="inp sm"></select></div>
+          </div>
+          <div class="row"><div class="fld"><label class="fl">Server head-end (nối vào core switch)</label><input id="svServers" class="inp sm" placeholder="GRMS, BMS, PMS, Lock Server"></div></div>
+          <div class="row">
+            <div class="fld"><label class="fl">Tủ rack server — thiết bị (cách nhau ;) gồm cả Core Switch</label><input id="svRackItems" class="inp sm"></div>
+            <div class="fld" style="max-width:118px"><label class="fl">Mã rack</label><input id="svRackCode" class="inp sm"></div>
+          </div>
+          <div class="row">
+            <div class="fld"><label class="fl">Cáp quang lên tầng</label><input id="svFiber" class="inp sm"></div>
+            <div class="fld"><label class="fl">Nguồn cấp</label><input id="svPower" class="inp sm"></div>
+          </div>
+          <div class="row"><div class="fld"><label class="fl">Uplink / kết nối ngoài</label><input id="svUplink" class="inp sm"></div></div>
+          <div class="row"><div class="fld"><label class="fl">Block server import (.dwg) — trống = vẽ ký hiệu</label><input id="svBlock" class="inp sm mono" placeholder="C:\GEC\Blocks\Server.dwg"></div></div>
+        </div>
+      </div>
+      <div class="hint">Toàn bộ thiết bị phòng server (ODF · <b>Core Switch</b> · PDU · Server) nằm trong <b>1 tủ rack server</b>. GRMS/BMS/PMS/Lock nối vào <b>core switch</b> trong rack. Mỗi tầng nhập RCU theo <b>TYPE × số phòng</b>; tick <b>Tủ rack tầng</b> để vẽ tủ switch tầng.</div>
+      <div id="floorList"></div>
+    </div>
+    <div class="gutter" data-g="tw1"></div>
+    <div class="col pv">
+      <div class="pvbar">
+        <div class="seg"><button class="on" data-pvt="svg">Sơ đồ</button><button data-pvt="code">LISP</button></div>
+        <div class="sp"></div>
+        <button class="btn sm" id="dlTopo" style="height:30px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>diagram_topology.lsp</button>
+        <button class="btn sm" id="pdfTopo" style="height:30px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>PDF A3</button>
+      </div>
+      <div class="pvwrap">
+        <svg class="svgbox" id="svgTopo"></svg>
+        <div class="codebox" id="codeTopo"><pre class="code mono" id="lispTopo"></pre></div>
+        <div class="zoom" id="zoomTopo"><button class="zhandle" data-z="drag" title="Kéo để di chuyển">✛</button><button data-z="-" title="Thu nhỏ">−</button><button data-z="f" title="Vừa khung">⤢</button><button data-z="+" title="Phóng to">+</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TAB 3 : DB-RCU POWER ================= -->
+  <section class="view" id="viewDB">
+    <!-- left: incoming / main config -->
+    <div class="col">
+      <div class="colhd"><h2>Cấu hình tủ</h2></div>
+      <div class="card">
+        <div class="h">Nguồn vào / MCB chính</div>
+        <div class="b">
+          <div class="row"><div class="fld"><label class="fl">Nguồn cấp</label><input id="dbSrc" class="inp sm" value="FROM DB FLOOR"></div></div>
+          <div class="row">
+            <div class="fld"><label class="fl">MCB chính</label><select id="dbMainType" class="inp sm"></select></div>
+            <div class="fld"><label class="fl">Thông số</label><input id="dbMainSpec" class="inp sm" value="25A/6kA"></div>
+          </div>
+          <div class="row"><div class="fld"><label class="fl">Cáp nguồn vào</label><input id="dbCableIn" class="inp sm mono" value=""></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="h">Thống kê thiết bị</div>
+        <div class="b"><div id="dbSummary" style="font-size:12.5px;line-height:1.7"></div></div>
+      </div>
+      <div class="hint">Phòng KS chuẩn: 1 MCB chính · 1–2 RCBO ổ cắm · 2–5 MCB 1P (đèn/FCU). Cột <b>SL</b> tự nhân bản &amp; đánh số nhãn trên bản vẽ.</div>
+    </div>
+
+    <div class="gutter" data-g="dw1"></div>
+
+    <!-- middle: circuit list editor -->
+    <div class="col mid">
+      <div class="midbar">
+        <h2>Mạch ra (DB-RCU)</h2>
+        <span class="badge" id="dbCount" style="font-size:11px;color:var(--muted)"></span>
+        <div class="sp"></div>
+        <button class="btn sm" id="addCkt" style="height:32px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M12 5v14M5 12h14"/></svg>Thêm mạch</button>
+      </div>
+      <div class="miobody"><div id="cktList"></div></div>
+    </div>
+
+    <div class="gutter" data-g="dw3"></div>
+
+    <!-- right: preview -->
+    <div class="col pv">
+      <div class="pvbar">
+        <div class="seg"><button class="on" data-pvd="svg">Sơ đồ</button><button data-pvd="code">LISP</button></div>
+        <div class="sp"></div>
+        <button class="btn sm" id="dlDB" style="height:30px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>diagram_db.lsp</button>
+        <button class="btn sm" id="pdfDB" style="height:30px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>PDF A3</button>
+      </div>
+      <div class="pvwrap">
+        <svg class="svgbox" id="svgDB"></svg>
+        <div class="codebox" id="codeDB"><pre class="code mono" id="lispDB"></pre></div>
+        <div class="zoom" id="zoomDB"><button class="zhandle" data-z="drag" title="Kéo để di chuyển">✛</button><button data-z="-" title="Thu nhỏ">−</button><button data-z="f" title="Vừa khung">⤢</button><button data-z="+" title="Phóng to">+</button></div>
+      </div>
+    </div>
+  </section>
+  <!-- ================= TAB 4 : PANEL LAYOUT ================= -->
+  <section class="view" id="viewLayout">
+   <div class="pdwrap">
+    <div class="pdcol">
+      <div class="card">
+        <div class="h">Thiết bị<button class="tinybtn" id="pdImportS" style="margin-left:auto">⟵ Lấy từ sơ đồ nguyên lý</button></div>
+        <div class="b">
+          <input class="inp sm" id="pdSearch" placeholder="Tìm mã / mô tả...">
+          <div class="pd-lib" id="pdLib"></div>
+          <table class="pd-tbl" id="pdSelTbl"><thead><tr><th>Mã hiệu</th><th>SL</th><th>md</th><th>Zone</th><th>Block (DXF)</th><th></th></tr></thead><tbody id="pdSelBody"></tbody></table>
+          <div class="flex" style="margin-top:8px;gap:6px"><button class="btn sm" id="pdAddCustom">＋ Thiết bị tùy chỉnh</button><button class="btn sm" id="pdLoadDxf">⬆ Tải thư viện DXF</button><span id="pdDxfStat" style="font-size:11px;color:var(--muted)"></span></div>
+          <input type="file" id="pdDxfFile" accept=".dxf" hidden>
+        </div>
+      </div>
+      <div class="card">
+        <div class="h">Chế độ bố trí</div>
+        <div class="b">
+          <div class="pd-seg"><button id="pdModeAuto" class="on">Tự động (fill)</button><button id="pdModeManual">Manual (kéo thả)</button></div>
+          <div class="hint" style="margin-top:7px">• <b>Tự động</b>: ưu tiên fill mặt <b>Internal Front</b>, đủ mới tràn lên <b>Door</b>.<br>• <b>Manual</b>: kéo thả tùy ý.</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="h">Thông số vỏ tủ</div>
+        <div class="b">
+          <div class="row"><div class="fld"><label class="fl">Rộng W</label><input class="inp sm" id="pdW" type="number" value="450"></div><div class="fld"><label class="fl">Cao H</label><input class="inp sm" id="pdH" type="number" value="650"></div><div class="fld"><label class="fl">Sâu D</label><input class="inp sm" id="pdD" type="number" value="200"></div></div>
+          <div class="row"><div class="fld"><label class="fl">Lề ngang</label><input class="inp sm" id="pdMgX" type="number" value="60"></div><div class="fld"><label class="fl">Lề dọc</label><input class="inp sm" id="pdMgY" type="number" value="60"></div><div class="fld"><label class="fl">Pitch hàng</label><input class="inp sm" id="pdPitch" type="number" value="110"></div></div>
+          <div class="row"><div class="fld"><label class="fl">Khe an toàn</label><input class="inp sm" id="pdGap" type="number" value="80"></div><div class="fld"><label class="fl">Dày tôn</label><input class="inp sm" id="pdPlate" type="number" value="20"></div><div class="fld" style="display:flex;align-items:flex-end"><label style="font-size:11.5px;display:flex;gap:5px;align-items:center;color:var(--muted);font-weight:600"><input type="checkbox" id="pdFill" style="width:auto"> Filler</label></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="h">Máng cáp (wire duct)</div>
+        <div class="b">
+          <div class="hint" style="margin-bottom:8px">Máng dọc trái/phải chọn size riêng (ăn bề rộng). Máng ngang tự sinh theo số hàng (mỗi máng size riêng, ăn chiều cao). Thiết bị cách máng <b>25mm</b> mép trên & dưới.</div>
+          <div class="row">
+            <div class="fld"><label class="miniswitch"><input type="checkbox" id="pdVLon" checked> Máng dọc TRÁI</label><select class="inp sm" id="pdVLsize" style="margin-top:5px"></select></div>
+            <div class="fld"><label class="miniswitch"><input type="checkbox" id="pdVRon" checked> Máng dọc PHẢI</label><select class="inp sm" id="pdVRsize" style="margin-top:5px"></select></div>
+          </div>
+          <div class="row"><div class="fld"><label class="miniswitch"><input type="checkbox" id="pdHTon" checked> Máng ngang TRÊN CÙNG</label><select class="inp sm" id="pdHTsize" style="margin-top:5px"></select></div></div>
+          <label class="fl" style="margin-top:6px">Máng ngang giữa các hàng (tự sinh theo số hàng)</label>
+          <div id="pdHDlist" style="display:flex;flex-direction:column;gap:5px;margin-top:4px"></div>
+          <div id="pdDuctStat" style="font-size:11.5px;color:var(--muted);margin-top:6px"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="h">Kéo-thả bố trí</div>
+        <div class="b">
+          <div class="hint" style="margin-bottom:8px">Viền đỏ = tràn hàng. Manual mới kéo được.</div>
+          <div class="pd-zone"><h4>▦ Internal Front (Panel)<span id="pdPanelMod"></span></h4><div class="pd-list" id="pdZonePanel"></div></div>
+          <div class="pd-zone"><h4>🚪 Door (cánh cửa)<span id="pdDoorMod"></span></h4><div class="pd-list" id="pdZoneDoor"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="pdcol">
+      <div class="card" style="min-height:540px">
+        <div class="h">Bản vẽ tủ 6 mặt<span id="pdStat" style="margin-left:auto;font-weight:600"></span></div>
+        <div class="b">
+          <div class="pd-tabs" id="pdViewTabs"></div>
+          <div class="pdbar"><button class="btn sm" id="pdExpLisp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>Panel LISP</button><button class="btn sm" id="pdExpPdf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>PDF</button></div>
+          <div id="pdView" style="overflow:auto;min-height:300px"></div>
+          <div class="h" style="margin-top:14px">Technical Data for DB</div>
+          <div id="pdTechData"></div>
+        </div>
+      </div>
+    </div>
+   </div>
+  </section>
+
+  <!-- ================= TAB 5 : PRELIMINARY COST ================= -->
+  <section class="view" id="viewCost">
+   <div class="pdwrap">
+    <div class="pdcol">
+      <div class="card">
+        <div class="h">Vỏ tủ + gia công</div>
+        <div class="b">
+          <div class="hint" style="margin-bottom:8px">Đơn giá tham khảo — thay bằng 06_Pricing.</div>
+          <div class="row"><div class="fld"><label class="fl">Dày vỏ</label><select class="inp sm" id="pdTShell"><option>1.2</option><option selected>1.5</option><option>2.0</option></select></div><div class="fld"><label class="fl">Dày panel</label><select class="inp sm" id="pdTPlate"><option>2.0</option><option selected>2.5</option></select></div><div class="fld"><label class="fl">Tôn đ/kg</label><input class="inp sm" id="pdPSteel" type="number" value="25000"></div></div>
+          <div class="row"><div class="fld"><label class="fl">Hao hụt %</label><input class="inp sm" id="pdWaste" type="number" value="18"></div><div class="fld"><label class="fl">Sơn đ/m²</label><input class="inp sm" id="pdPPaint" type="number" value="60000"></div><div class="fld"><label class="fl">NC đ/md</label><input class="inp sm" id="pdPLabor" type="number" value="9000"></div></div>
+          <div id="pdCostShell" style="margin-top:6px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="pdcol">
+      <div class="card">
+        <div class="h">Giá trị thiết bị <span style="margin-left:auto;font-size:11px;color:var(--muted)">lấy từ Bố trí tủ điện</span></div>
+        <div class="b"><div class="hint" style="margin-bottom:7px">Nhập đơn giá đầu vào (06_Pricing).</div><div id="pdDevCost" style="max-height:300px;overflow:auto"></div></div>
+      </div>
+      <div class="card pd-total">
+        <div class="b">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div><div style="font-size:11px;opacity:.85;text-transform:uppercase">Giá thành sơ bộ tủ</div><div class="pd-big" id="pdTotCost">0</div></div>
+            <div><div style="font-size:11px;opacity:.85;text-transform:uppercase">Trọng lượng</div><div class="pd-big" id="pdTotKg">0</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:9px;margin-top:13px;padding-top:13px;border-top:1px solid rgba(255,255,255,.2)">
+            <span style="font-size:12px">Hệ số bán</span><input class="inp sm" id="pdFactor" type="number" value="1.35" step="0.01" style="width:78px">
+            <span style="font-size:12px">→ Giá bán:</span><span class="pd-big" style="font-size:21px" id="pdSell">0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+   </div>
+  </section>
+
+  <!-- ================= TAB 6 : OPTIMAL DEVICE SELECTION ================= -->
+  <section class="view" id="viewOpt">
+   <div class="optwrap">
+    <div class="optcol">
+      <div class="card">
+        <div class="h">① Yêu cầu I/O của phòng/space<button class="tinybtn" id="optFromWire" style="margin-left:auto">⟵ Lấy từ sơ đồ hiện tại</button></div>
+        <div class="b">
+          <div class="hint" style="margin-bottom:9px">Nhập số kênh cần dùng cho 1 phòng/space. Thuật toán chọn cấu hình Dynalite ít module nhất, ít dư nhất.</div>
+          <div class="opt-grid">
+            <div class="fld"><label class="fl">DI — Input số</label><input class="inp sm" id="reqDI" type="number" min="0" value="21"></div>
+            <div class="fld"><label class="fl">DO — Relay ON/OFF</label><input class="inp sm" id="reqDO" type="number" min="0" value="12"></div>
+            <div class="fld"><label class="fl">DALI — Số line (64 địa chỉ/line)</label><input class="inp sm" id="reqDALI" type="number" min="0" max="100" value="0"></div><div class="fld"><label class="fl">AO — Dim 0-10V</label><input class="inp sm" id="reqAO" type="number" min="0" value="0"></div>
+            <div class="fld"><label class="fl">DIM — TRIAC 220V</label><input class="inp sm" id="reqDIM" type="number" min="0" value="0"></div>
+            <div class="fld"><label class="fl">DMX — RGBW (ch)</label><input class="inp sm" id="reqDMX" type="number" min="0" value="0"></div>
+            <div class="fld"><label class="fl">SPI — không có model tương đương</label><input class="inp sm" id="reqSPI" title="Chưa có Dynalite SPI trong catalog" type="number" min="0" value="0"></div>
+            <div class="fld"><label class="fl">Samsung AC — cần gateway ngoài</label><input class="inp sm" id="reqAC" type="number" min="0" value="0"></div>
+            <div class="fld" style="display:flex;align-items:flex-end"><button class="btn pri full" id="optRun" style="height:34px">Tính cấu hình</button></div>
+          </div>
+          <div class="opt-presets">
+            <span style="font-size:11px;color:var(--muted);font-weight:600">Mẫu nhanh:</span>
+            <button class="optchip" data-preset="11,4,0,0,0,0,0">Căn hộ 11/4</button>
+            <button class="optchip" data-preset="21,8,0,0,0,0,1">KS standard 21/8 +1AC</button>
+            <button class="optchip" data-preset="21,12,0,0,0,0,2">KS 21/12 +2AC</button>
+            <button class="optchip" data-preset="30,16,2,0,0,1,2">Suite 30/16 +SPI+AC</button>
+            <button class="optchip" data-preset="48,28,4,2,8,2,4">Villa full 48/28 đủ trục</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="h">② Tham số thuật toán</div>
+        <div class="b">
+          <div class="row">
+            <div class="fld"><label class="fl">Tie-break (khi hòa số module)</label>
+              <select class="inp sm" id="optTie"><option value="waste" selected>Ít dư nhất (thuần toán)</option><option value="base">Ghim base DDRC-GRMS-E (KS)</option></select></div>
+          </div>
+          <div class="row">
+            <div class="fld"><label class="fl">Dự phòng PA tiết kiệm (%)</label><input class="inp sm" id="optSpareSave" type="number" min="0" value="0"></div>
+            <div class="fld"><label class="fl">Dự phòng PA tối ưu (%)</label><input class="inp sm" id="optSpareOpt" type="number" min="0" value="15"></div>
+          </div>
+          <div class="hint" style="margin-top:4px">
+            <b>PA tiết kiệm</b> = né master, base rẻ + module mở rộng, 0% dự phòng → giá thấp nhất.<br>
+            <b>PA tối ưu</b> = cho phép master gộp (48IN16RL…) + dự phòng, ít đấu nối hơn → vận hành gọn.
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="h">③ Thuật toán (3 bước)</div>
+        <div class="b">
+          <ol style="margin:0;padding-left:18px;font-size:12px;line-height:1.7;color:var(--ink)">
+            <li>Duyệt mọi Main hợp lệ → chọn <b>ít module nhất</b>, hòa thì <b>ít dư nhất</b>.</li>
+            <li>Bù DI bằng EXT-24IN/48IN; bù DO bin-pack {20,12,8,6}RL; bù AO/DIM/DMX bằng EXT tương ứng.</li>
+            <li>Ra <b>2 phương án</b>: tiết kiệm (né master) · tối ưu (cho phép master gộp, + dự phòng).</li>
+          </ol>
+          <div class="hint" style="margin-top:8px">Công cụ chỉ đưa <b>cấu hình + tỷ lệ lấp đầy</b>. So giá đầu vào ở <code>06_Pricing</code> để chốt hệ số bán.</div>
+        </div>
+      </div>
+    </div>
+    <div class="optcol">
+      <div id="optResult"></div>
+    </div>
+   </div>
+  </section>
+
+</main>
+
+<div class="toast" id="toast"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg><span id="toastMsg"></span></div>
+
+<div class="modal" id="helpModal">
+  <div class="modal-card">
+    <div class="modal-h">
+      <span>Hướng dẫn sử dụng · GEC SDNL AutoLISP</span>
+      <button class="iconbtn" id="helpClose" title="Đóng">✕</button>
+    </div>
+    <div class="modal-b" id="helpBody"></div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+
+<script src="/panel.js"></script>
+</body>
+</html>
