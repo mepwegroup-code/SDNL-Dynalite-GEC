@@ -22,4 +22,4 @@ Ngày kiểm tra: 10/11/2026.
 - PASS: All generated SVG coordinates are finite
 - PASS: No DOM runtime errors
 
-Giới hạn: kiểm thử giao diện bằng jsdom, chưa kiểm thử hiển thị trực tiếp trên trình duyệt thực tế do môi trường hạn chế. PDF chưa được xác minh hình ảnh đầu ra; AutoLISP đã kiểm tra cấu trúc dấu ngoặc và BLOCK/INSERT nhưng chưa chạy trong AutoCAD. Chưa deploy Vercel. Chưa upload GitHub: công cụ hiện tại không tạo được repo mới và trình duyệt yêu cầu đăng nhập.
+Giới hạn: kiểm thử giao diện bằng jsdom, chưa kiểm thử hiển thị trực tiếp trên trình duyệt thực tế do môi trường hạn chế. PDF chưa được xác minh hình ảnh đầu ra; AutoLISP đã kiểm tra cấu trúc dấu ngoặc và BLOCK/INSERT nhưng chưa chạy trong AutoCAD. Chưa deploy Vercel. Bản sửa 404: chuyển ứng dụng từ thư mục con `SDNL_Dynalite_GEC_Vercel_v1.0/` ra gốc repo để Vercel nhận được entry point và cấu hình build. Kiểm tra lại SHA mã nguồn khớp bản đã test; build và toàn bộ đường dẫn CSS/JS/vendor trong output đều tồn tại. Chưa xác minh website Vercel thực tế.
